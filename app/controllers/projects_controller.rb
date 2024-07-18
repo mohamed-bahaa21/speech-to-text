@@ -25,6 +25,7 @@ class ProjectsController < ApplicationController
 
     respond_to do |format|
       if @project.save
+        ProcessTranscriptionJob.perform_later(@project.id)
         format.html { redirect_to project_url(@project), notice: "Project was successfully created." }
         format.json { render :show, status: :created, location: @project }
       else
@@ -38,6 +39,8 @@ class ProjectsController < ApplicationController
   def update
     respond_to do |format|
       if @project.update(project_params)
+        @project.pending!
+        ProcessTranscriptionJob.perform_later(@project.id)
         format.html { redirect_to project_url(@project), notice: "Project was successfully updated." }
         format.json { render :show, status: :ok, location: @project }
       else
@@ -65,6 +68,6 @@ class ProjectsController < ApplicationController
 
     # Only allow a list of trusted parameters through.
     def project_params
-      params.require(:project).permit(:name, :transcription, :status)
+      params.require(:project).permit(:name, :transcription, :file)
     end
 end
