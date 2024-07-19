@@ -1,5 +1,3 @@
-# pip install torch openai-whisper
-
 import sys
 import torch
 import whisper
@@ -13,8 +11,6 @@ model = whisper.load_model("small.en").to(device)
 def transcribe_audio(audio_file, output_queue):
     result = model.transcribe(audio_file)
     output_queue.put(result["text"])
-
-# transcribe_audio("Users/mohamedelzohary/Documents/voice-to-text-test-record.m4a")
 
 def start_model_server(input_queue, output_queue):
     while True:
@@ -30,12 +26,23 @@ if __name__ == "__main__":
     input_queue = Queue()
     output_queue = Queue()
     model_process = Process(target=start_model_server, args=(input_queue, output_queue))
+    model_process.start()
 
-    while True:
-        input_file = sys.stdin.readline().strip()
-        if not input_file or input_file == "exit":
-            input_queue.put(None)
-            break
-        input_queue.put(input_file)
-        print(output_queue.get(), flush=True)
-        print("___TRANSCRIPTION_END___", flush=True)
+    try:
+        while True:
+            input_file = sys.stdin.readline().strip()
+            if not input_file or input_file.lower() == "exit":
+                input_queue.put(None)
+                break
+            input_queue.put(input_file)
+            try:
+                # Add a timeout to avoid blocking indefinitely
+                print(output_queue.get(timeout=10), flush=True)
+            except queue.Empty:
+                print("No transcription result available.", flush=True)
+            print("___TRANSCRIPTION_END___", flush=True)
+    except KeyboardInterrupt:
+        print("Process interrupted.", flush=True)
+    finally:
+        input_queue.put(None)  # Ensure the model process exits
+        model_process.join()  # Wait for the model process to exit
