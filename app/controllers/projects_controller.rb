@@ -1,5 +1,6 @@
 class ProjectsController < ApplicationController
   before_action :set_project, only: %i[ show edit update destroy ]
+  protect_from_forgery with: :null_session
 
   # GET /projects or /projects.json
   def index
@@ -13,6 +14,19 @@ class ProjectsController < ApplicationController
   # GET /projects/new
   def new
     @project = Project.new
+  end
+
+  def upload
+    Rails.logger.info("Received audio file: #{params}")
+    audio_file = params[:audio]
+    if audio_file
+      File.open(Rails.root.join('public', 'uploads', audio_file.original_filename), 'wb') do |file|
+        file.write(audio_file.read)
+      end
+      render json: { message: 'Audio uploaded successfully' }, status: :ok
+    else
+      render json: { message: 'No audio file received' }, status: :unprocessable_entity
+    end
   end
 
   # GET /projects/1/edit
@@ -39,8 +53,6 @@ class ProjectsController < ApplicationController
   def update
     respond_to do |format|
       if @project.update(project_params)
-        @project.pending!
-        ProcessTranscriptionJob.perform_later(@project.id)
         format.html { redirect_to project_url(@project), notice: "Project was successfully updated." }
         format.json { render :show, status: :ok, location: @project }
       else

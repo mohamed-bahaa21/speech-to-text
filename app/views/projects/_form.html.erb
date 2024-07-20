@@ -1,4 +1,5 @@
-<%= form_with(model: project) do |form| %>
+<%= form_with(model: project, html: { enctype: "multipart/form-data", id: "audio-form" }) do |form| %>
+
   <% if project.errors.any? %>
     <div style="color: red">
       <h2><%= pluralize(project.errors.count, "error") %> prohibited this project from being saved:</h2>
@@ -23,10 +24,73 @@
 
   <div>
     <%= form.label :file, style: "display: block" %>
-    <%= form.file_field :file %>
+    <%= form.file_field :file, id: "audio_file" %>
   </div>
 
+  <hr>
+
+  <button type="button" id="record-button">Record Audio</button>
+  <audio id="audio-playback" controls style="display: block;"></audio>
+
   <div>
-    <%= form.submit %>
+    <%= form.submit "Send", class: "btn btn-primary" %>
   </div>
 <% end %>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/recorderjs/0.1.0/recorder.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    let recorder;
+    let audioContext;
+    let gumStream;
+
+    const recordButton = document.getElementById('record-button');
+    const uploadButton = document.getElementById('upload-button');
+    const audioForm = document.getElementById('audio-form');
+    const audioFileInput = document.getElementById('audio_file'); // Changed id here
+    const audioPlayback = document.getElementById('audio-playback');
+
+    recordButton.addEventListener('click', startRecording);
+
+    function startRecording() {
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          gumStream = stream;
+          const input = audioContext.createMediaStreamSource(stream);
+          recorder = new Recorder(input, { numChannels: 1 });
+
+          recorder.record();
+          recordButton.textContent = 'Stop Recording';
+          recordButton.removeEventListener('click', startRecording);
+          recordButton.addEventListener('click', stopRecording);
+        }).catch(err => {
+          console.error('Error accessing media devices.', err);
+        });
+    }
+
+    function stopRecording() {
+      recorder.stop();
+      gumStream.getAudioTracks()[0].stop();
+
+      recorder.exportWAV(blob => {
+        const url = URL.createObjectURL(blob);
+        audioPlayback.src = url;
+        audioPlayback.style.display = 'block';
+        
+        const file = new File([blob], 'audio.wav', { type: 'audio/wav' });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        audioFileInput.files = dataTransfer.files;
+
+        recordButton.textContent = 'Record Audio';
+        uploadButton.style.display = 'block';
+      });
+
+      recordButton.removeEventListener('click', stopRecording);
+      recordButton.addEventListener('click', startRecording);
+    }
+
+    
+  });
+</script>
